@@ -47,32 +47,39 @@ const IS_CLAUDE = typeof window !== 'undefined' &&
    window.location.protocol === 'blob:' ||
    window.location.hostname === '');
 
-// ─── Gemini Flash API ─────────────────────────────────────────
-async function callGemini(msgs, sysprompt, maxTokens=700, imgData=null) {
+// ─── Groq API ─────────────────────────────────────────────────
+async function callGroq(msgs, sysprompt, maxTokens=700, imgData=null) {
   const apiKey = db.graw(K.apikey);
-  if (!apiKey) return { message:'⚠️ Configura a Gemini API key na aba ⚙️ API.', error:true };
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  const contents = msgs.map(m => ({
-    role: (m.role==='assistant'||m.role==='model') ? 'model' : 'user',
-    parts: [{ text: m.content || m.text || '' }]
-  }));
-  if (imgData) {
-    const lastUser = [...contents].reverse().find(c=>c.role==='user');
-    if (lastUser) lastUser.parts = [
-      { inline_data:{ mime_type:imgData.mimeType, data:imgData.data } },
-      ...lastUser.parts
-    ];
-  }
-  const body = {
-    system_instruction: { parts:[{ text:sysprompt }] },
-    contents,
-    generationConfig: { maxOutputTokens:maxTokens, temperature:0.3 }
-  };
+  if (!apiKey) return { message:'⚠️ Configura a Groq API key na aba ⚙️ API.', error:true };
+
+  // Modelo com imagem vs só texto
+  const model = imgData
+    ? 'meta-llama/llama-4-scout-17b-16e-instruct'
+    : 'llama-3.3-70b-versatile';
+
+  const messages = [{ role:'system', content: sysprompt }];
+
+  msgs.forEach(m => {
+    const role = (m.role==='assistant'||m.role==='model') ? 'assistant' : 'user';
+    if (imgData && m === msgs[msgs.length-1] && role==='user') {
+      messages.push({ role:'user', content:[
+        { type:'image_url', image_url:{ url:`data:${imgData.mimeType};base64,${imgData.data}` }},
+        { type:'text', text: m.content || m.text || '' }
+      ]});
+    } else {
+      messages.push({ role, content: m.content || m.text || '' });
+    }
+  });
+
   try {
-    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, max_tokens:maxTokens, temperature:0.3 })
+    });
     if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
     const data = await res.json();
-    const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text||'')
+    const raw = (data.choices?.[0]?.message?.content||'')
       .replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();
     try { return JSON.parse(raw); } catch { return { message:raw }; }
   } catch(e) { return { message:`Erro: ${e.message}`, error:true }; }
@@ -84,7 +91,7 @@ async function callClaude(msgs, sysprompt, maxTokens=700, imgData=null) {
     if (imgData && m === msgs[msgs.length-1] && m.role==='user') {
       return { role:'user', content:[
         { type:'image', source:{ type:'base64', media_type:imgData.mimeType, data:imgData.data }},
-        { type:'text',  text: m.content || m.text || '' }
+        { type:'text', text: m.content || m.text || '' }
       ]};
     }
     return { role: m.role==='model'?'assistant':m.role, content: m.content || m.text || '' };
@@ -98,10 +105,10 @@ async function callClaude(msgs, sysprompt, maxTokens=700, imgData=null) {
   try { return JSON.parse(raw); } catch { return { message:raw }; }
 }
 
-// ─── Router: Claude no artifact, Gemini no GitHub ────────────
+// ─── Router: Claude no artifact, Groq no GitHub ───────────────
 async function callAI(msgs, sysprompt, maxTokens=700, imgData=null) {
   if (IS_CLAUDE) return callClaude(msgs, sysprompt, maxTokens, imgData);
-  return callGemini(msgs, sysprompt, maxTokens, imgData);
+  return callGroq(msgs, sysprompt, maxTokens, imgData);
 }
 
 // ─── Perfil Edgar ─────────────────────────────────────────────
@@ -750,26 +757,26 @@ function ApiView({ apiKey, onSave }) {
 
       {/* Como obter */}
       <div style={{background:'#0a1020',border:'1px solid #1a2a3a',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-        <div style={{fontSize:12,fontWeight:'bold',color:'#60a5fa',marginBottom:10}}>📋 Como obter a Gemini API Key (grátis)</div>
+        <div style={{fontSize:12,fontWeight:'bold',color:'#60a5fa',marginBottom:10}}>📋 Como obter a Groq API Key (grátis)</div>
         {[
-          '1. Vai a aistudio.google.com no browser',
-          '2. Faz login com a tua conta Google',
-          '3. Clica em "Get API key" → "Create API key"',
-          '4. Copia a key gerada (começa com AIzaSy...)',
+          '1. Vai a console.groq.com no browser',
+          '2. Faz login ou cria conta grátis',
+          '3. Vai a "API Keys" → "Create API key"',
+          '4. Copia a key gerada (começa com gsk_...)',
           '5. Cola aqui em baixo e guarda',
         ].map((s,i)=>(
           <div key={i} style={{fontSize:12,color:'#889',lineHeight:1.7,padding:'2px 0'}}>{s}</div>
         ))}
         <div style={{fontSize:11,color:'#4ade80',marginTop:8}}>
-          ✅ Gratuito · 1.500 req/dia · Sem cartão de crédito · Funciona em Angola
+          ✅ Gratuito · 14.400 req/dia · Sem cartão de crédito · Ultra rápido
         </div>
       </div>
 
       {/* Input da key */}
       <div style={S.card}>
-        <label style={S.lbl}>Gemini API Key</label>
+        <label style={S.lbl}>Groq API Key</label>
         <input style={{...S.inp,marginBottom:8,letterSpacing:'0.04em'}}
-          type='password' placeholder='AIzaSy...'
+          type='password' placeholder='gsk_...'
           value={k} onChange={e=>{setK(e.target.value);setSaved(false);}}/>
         <div style={{fontSize:10,color:'#445',marginBottom:14,lineHeight:1.5}}>
           A key é guardada localmente no teu dispositivo — nunca é enviada para outros servidores.
@@ -786,8 +793,8 @@ function ApiView({ apiKey, onSave }) {
         <div style={{fontSize:11,color:'#445',letterSpacing:'0.08em',marginBottom:10}}>MODELO EM USO</div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0'}}>
           <div>
-            <div style={{fontSize:13,color:'#ccc',fontWeight:'bold'}}>Gemini 2.5 Flash</div>
-            <div style={{fontSize:11,color:'#445',marginTop:2}}>Texto + Imagem · 250 req/dia grátis · Multilingue</div>
+            <div style={{fontSize:13,color:'#ccc',fontWeight:'bold'}}>Groq — Llama 3.3 70B + Llama 4 Scout</div>
+            <div style={{fontSize:11,color:'#445',marginTop:2}}>Texto: Llama 3.3 · Imagem: Llama 4 Scout · 14.400 req/dia</div>
           </div>
           <span style={{fontSize:10,background:'#0d1e10',border:'1px solid #1a401e',color:'#4ade80',padding:'3px 8px',borderRadius:20}}>Activo</span>
         </div>
