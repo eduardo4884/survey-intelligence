@@ -51,7 +51,7 @@ const IS_CLAUDE = typeof window !== 'undefined' &&
 async function callGemini(msgs, sysprompt, maxTokens=700, imgData=null) {
   const apiKey = db.graw(K.apikey);
   if (!apiKey) return { message:'⚠️ Configura a Gemini API key na aba ⚙️ API.', error:true };
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
   const contents = msgs.map(m => ({
     role: (m.role==='assistant'||m.role==='model') ? 'model' : 'user',
     parts: [{ text: m.content || m.text || '' }]
