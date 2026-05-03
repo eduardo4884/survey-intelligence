@@ -51,7 +51,7 @@ const IS_CLAUDE = typeof window !== 'undefined' &&
 async function callGemini(msgs, sysprompt, maxTokens=700, imgData=null) {
   const apiKey = db.graw(K.apikey);
   if (!apiKey) return { message:'⚠️ Configura a Gemini API key na aba ⚙️ API.', error:true };
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const contents = msgs.map(m => ({
     role: (m.role==='assistant'||m.role==='model') ? 'model' : 'user',
     parts: [{ text: m.content || m.text || '' }]
@@ -786,8 +786,8 @@ function ApiView({ apiKey, onSave }) {
         <div style={{fontSize:11,color:'#445',letterSpacing:'0.08em',marginBottom:10}}>MODELO EM USO</div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0'}}>
           <div>
-            <div style={{fontSize:13,color:'#ccc',fontWeight:'bold'}}>Gemini 1.5 Flash</div>
-            <div style={{fontSize:11,color:'#445',marginTop:2}}>Texto + Imagem · Multilingue · 1.500 req/dia grátis</div>
+            <div style={{fontSize:13,color:'#ccc',fontWeight:'bold'}}>Gemini 2.5 Flash</div>
+            <div style={{fontSize:11,color:'#445',marginTop:2}}>Texto + Imagem · 250 req/dia grátis · Multilingue</div>
           </div>
           <span style={{fontSize:10,background:'#0d1e10',border:'1px solid #1a401e',color:'#4ade80',padding:'3px 8px',borderRadius:20}}>Activo</span>
         </div>
